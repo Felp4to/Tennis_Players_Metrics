@@ -5,12 +5,12 @@ export function applyFilter(jsonFile, startInterval, endInterval, grain, nPlayer
     try {
         var result = [];
         
-        // itera attraverso gli anni
+        // years
         for (let year in jsonFile) {
             if (year < startInterval || year > endInterval) continue;
             const months = jsonFile[year];
             
-            // Verifica solo gennaio se il grain è "years"
+            // check grain
             for (let month in months) {
                 if (grain === 'Years' && month !== '01') continue;
                 
@@ -29,22 +29,29 @@ export function applyFilter(jsonFile, startInterval, endInterval, grain, nPlayer
                     }
                 });
                 
-                // Interrompe l'iterazione dopo gennaio se il grain è "Years"
+                // interrupt iteration after january if grain is years
                 if (month === '01' && grain === 'Years') break;
             }
         }
 
-        // Ordinamento per data crescente e rank crescente
+        // order by data and rank 
         result.sort((a, b) => {
-            // Confronto per data
+            // comparison by times
             if (a.data < b.data) return -1;
             if (a.data > b.data) return 1;
         
-            // Se le date sono uguali, confronto per rank
+            // if times are equal, comparison by rank
             return a.rank - b.rank;
         });
 
+        // convert to object Date
+        result.forEach(d => {
+            d.data = d3.timeParse('%Y-%m')(d.data);
+            d.dataFormatted = d3.timeFormat('%Y-%m')(d.data);
+        });
+
         return result;
+        
     } catch (error) {
         console.error(error);
         return null;

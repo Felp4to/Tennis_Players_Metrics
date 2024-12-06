@@ -1,335 +1,411 @@
 // lineChart.js
 
-import { getPointsbyDataRank } from './filterData.js';
+import * as Constants from './constants.js';
 import { getRankingbyData } from './filterData.js';
 import { getDataPlayer } from './filterData.js';
 import { applyFilter } from './filterData.js';
+import { convertToYYYYMM } from './functions.js';
 
 
 export function drawLineChart(jsonRanking, jsonPlayers, startInterval, endInterval, grain, nPlayers) {
     try {
-        
-        // Select html elements
-        const playerId = d3.select('#player');
-        const nameTooltip = d3.select('#name-tooltip');
-        const lastTooltip = d3.select('#last-tooltip');
-        const nationTooltip = d3.select('#nation-tooltip');
-        const handTooltip = d3.select('#hand-tooltip');
-        const heightTooltip = d3.select('#height-tooltip');
-        const pointsTooltip = d3.select('#points-tooltip');
-        const rankingTooltip = d3.select('#ranking-tooltip');
-        const rankingCol = d3.select('#ranking-col');
 
-        // Svuota il contenitore rankingCol eliminando tutti i suoi figli
-        rankingCol.selectAll("*").remove();
+        // select elements
+        const coordinateDiv = d3.select('#coordinate');
 
-        // clean e processing data
+        // VARIABLES 
+            // cursor
+        var cursorAbsX = null;                                  // posizione assoluta della x del cursore rispetto a svg
+        var cursorAbsY = null;                                  // posizione assoluta della y del cursore rispetto a svg
+        var cursorRelX = null;                                  // posizione relativa della x del cursore rispetto a svg
+        var cursorRelY = null;                                  // posizione relativa della y del cursore rispetto a svg
+        var cursorAxisX = null;                                 // valore dell'asse X
+        var cursorAxisY = null;                                 // valore dell'asse Y
+        var dateSlider = null;                                  // posizione dello slider
+
+        // prepare data
         var jsonFilteredRanking = applyFilter(jsonRanking, startInterval, endInterval, grain, nPlayers);
-
-        jsonFilteredRanking.forEach(d => {
-            // Parsing della data nel formato 'yyyy-mm'
-            d.data = d3.timeParse('%Y-%m')(d.data);
-            // Formattiamo la data nel formato 'yyyy-mm'
-            d.dataFormatted = d3.timeFormat('%Y-%m')(d.data);
+        jsonFilteredRanking.forEach(element => {
+            const info = getDataPlayer(jsonPlayers, element.player);
+            element.info = info;
         });
 
-        // Raggruppa i dati per giocatore
+        // group players data
         const players = d3.group(jsonFilteredRanking, d => d.player);
 
-        // Impostazioni del grafico
-        const margin = { top: 50, right: 30, bottom: 50, left: 40 };
-
-        // Larghezza totale dell'SVG (1100px)
-        const svgWidth = 1500;
-        const svgHeight = 600;
-
-        // Il grafico occuperà il 70% della larghezza dell'SVG (770px)
-        const widthChart = svgWidth * 0.65 - margin.left - margin.right;  // 70% della larghezza disponibile
-        const heightChart = svgHeight - margin.top - margin.bottom;  // Altezza del grafico
-
-        // Seleziona l'SVG principale e svuotalo
+        // SVG
         const svg = d3.select('svg')
-            .attr('width', svgWidth)
-            .attr('height', svgHeight);
-        svg.selectAll('*').remove();  // Pulizia
+            .attr('width', Constants.svgWidth)
+            .attr('height', Constants.svgHeight)
+            .on('mousemove', function(event) {
+                // Ottieni le coordinate del mouse relative all'elemento SVG
+                cursorAbsX = Math.round(d3.pointer(event)[0]);              // Coordinate X nel sistema dell'SVG
+                cursorAbsY = Math.round(d3.pointer(event)[1]);              // Coordinate Y nel sistema dell'SVG
+                
+                cursorRelX = Math.round(cursorAbsX - Constants.margin.left) + 1;
+                cursorRelY = Math.round(cursorAbsY - Constants.margin.top) + 1;
+                
+                // Converti le coordinate del mouse in coordinate relative al grafico (basato sulla scala)
+                cursorAxisX = x.invert(cursorAbsX - Constants.margin.left);
+                const formatDate = d3.timeFormat('%Y-%m');
+                cursorAxisX = formatDate(cursorAxisX);  
+                cursorAxisY = Math.round(y.invert(cursorAbsY - Constants.margin.top));
+                
+                // Aggiungi un nuovo div per ciascuna variabile
+                coordinateDiv.html(''); // Pulisce il contenuto del div prima di aggiungere nuovi div
+                
+                // Aggiungi div per ciascuna variabile
+                coordinateDiv.append('div').text(`cursorAxisX: X: ${cursorAxisX}  --- cursorAxisY: Y: ${cursorAxisY}`);
+                coordinateDiv.append('div').text(`cursorRelX: ${cursorRelX} --- cursorRelY: ${cursorRelY}`);
+                coordinateDiv.append('div').text(`cursorAbsX: ${cursorAbsX} --- cursorAbsY: ${cursorAbsY}`);
+                
+                svg.selectAll(".dot")
+                .each(function (d) {
+                    // Ottieni la posizione del cerchio dall'elemento DOM
+                    const cx = parseFloat(d3.select(this).attr("cx"));
+                    const cy = parseFloat(d3.select(this).attr("cy"));
+                    
+                    // Verifica se l'elemento ha la classe uguale alla variabile dateSlider
+                    const hasSpecificClass = d3.select(this).classed("date-" + dateSlider);
+                    
+                    if (hasSpecificClass) {
+                        return; // Non proseguire con il resto del codice
+                    }
 
-        // Aggiungi un contenitore principale per il grafico (senza margini)
+                    // Se ha la classe uguale a dateSlider, rimuovi l'immagine dentro il cerchio
+                    //d3.select(this.parentNode) // Il nodo contenitore è il parent del cerchio
+                    //    .select("image")       // Seleziona l'immagine dentro il cerchio
+                    //    .remove();             // Rimuovi l'immagine
+            
+                    // Calcola la distanza tra il cursore e il cerchio
+                    const distance = Math.sqrt(
+                        (cx - cursorRelX) ** 2 + (cy - cursorRelY) ** 2
+                    );
+            
+                    // Rimuovi l'immagine se il cerchio è fuori dal range di hover
+                    //if (distance > Constants.hoverDistance) {
+                    //    d3.select(this.parentNode) // Il nodo contenitore è il parent del cerchio
+                    //        .select("image")       // Seleziona l'immagine dentro il cerchio
+                    //        .remove();             // Rimuovi l'immagine
+                    //}
+                });
+            
+            });
+
+        svg.selectAll('*').remove();
+        
+        // add main container
         const container = svg.append('g')
-            .attr('transform', `translate(${margin.left},${margin.top})`);
-
-        // Scala per gli assi (X e Y)
+            .attr('transform', `translate(${Constants.margin.left},${Constants.margin.top})`);
+        
+        // scale for the axis
         const x = d3.scaleTime()
             .domain(d3.extent(jsonFilteredRanking, d => d.data))
-            .range([0, widthChart]);  // Limita la larghezza al 70%
-
+            .range([0, Constants.widthChart]);  
+        
         const y = d3.scaleLinear()
-            .domain([d3.max(jsonFilteredRanking.slice(0, nPlayers), d => d.rank), 1]) // Scala invertita
+            .domain([d3.max(jsonFilteredRanking.slice(0, nPlayers), d => d.rank), 1])
             .nice()
-            .range([heightChart, 0]);
-
-        // Configurazione asse X (dinamico in base alla granularità)
+            .range([Constants.heightChart, 0]);
+        
+        // configure axis x
         const xAxis = d3.axisBottom(x);
         if (grain === 'Months') {
             xAxis.ticks(d3.timeMonth.every(1))
-                .tickFormat(d3.timeFormat('%m-%y'));  // Mostra 'mm-yy'
+                .tickFormat(d3.timeFormat('%m-%y')); 
         } else if (grain === 'Years') {
             xAxis.ticks(d3.timeYear.every(1))
-                .tickFormat(d3.timeFormat('%Y'));  // Mostra 'yyyy'
+                .tickFormat(d3.timeFormat('%Y')); 
         }
 
-        // Configura l'asse Y (numeri interi e nPlayers)
+        // configure axis y
         const yAxis = d3.axisLeft(y)
             .ticks(nPlayers)
             .tickFormat(d3.format("d"));
-
-        // Aggiungi gli assi al grafico
+        
+        // add axis to graph
         container.append('g')
             .attr('class', 'x-axis')
-            .attr('transform', `translate(0,${heightChart})`)
+            .attr('transform', `translate(0,${Constants.heightChart})`)
             .call(xAxis);
 
         container.append('g')
             .attr('class', 'y-axis')
             .call(yAxis);
 
-        // Aggiungi una linea al grafico
+        // add line into graph
         const line = d3.line()
             .x(d => x(d.data))
             .y(d => y(d.rank));
 
-        // Colori per le linee (mappati esplicitamente)
-        const color = d3.scaleOrdinal(d3.schemeCategory10)
-            .domain(Array.from(players.keys()));
+        // label axis
+        container.append('text')
+            .attr('x', Constants.widthChart / 2)
+            .attr('y', Constants.heightChart + Constants.margin.bottom - 5)
+            .style('text-anchor', 'middle')
+            .text('Date');
 
-        // Traccia le linee per ogni giocatore
-        const allPoints = []; // Memorizza tutti i punti per il calcolo delle distanze
+        container.append('text')
+            .attr('x', -Constants.heightChart / 2)
+            .attr('y', -Constants.margin.left + 15)
+            .style('text-anchor', 'middle')
+            .attr('transform', 'rotate(-90)')
+            .text('Ranking');
+
+        // Creazione della scala di colori pastello
+        const color = d3.scaleOrdinal()
+            .domain(Array.from(players.keys()))
+            .range(d3.schemeCategory10.map(c => d3.interpolateLab(c, "#ffffff")(0.4)));
+
+        // CHART LINES PLAYERS
+        const allPoints = []; 
         players.forEach((playerData, player) => {
-            // Disegna la linea per il giocatore
+            // Disegna la linea per ogni giocatore
             container.append('path')
-                .datum(playerData)                          // Passa i dati del giocatore
-                .attr('class', 'line')                      // Classe per lo stile
-                .attr('d', line)                            // Disegna la linea
-                .style('stroke', color(player))             // Colore della linea
-                .style('stroke-width', 2)                   // Spessore della linea
-                .style('fill', 'none');                     // Nessun riempimento
-
+                .datum(playerData)                                          // Passa i dati del giocatore
+                .attr('class', d => `line player-${player} date-${d.dataFormatted}`)   // Classe per lo stile
+                .attr('d', line)                                            // Disegna la linea
+                .style('stroke', color(player))                             // Colore della linea in base al giocatore
+                .style('stroke-width', 2)                                   // Spessore della linea
+                .style('fill', 'none');                                     // Nessun riempimento per la linea
+        
             // Salva i punti per il controllo della distanza
             playerData.forEach(d => {
                 allPoints.push({
                     x: x(d.data),
                     y: y(d.rank),
                     player,
-                    rank: d.rank // Memorizza anche il rank
+                    rank: d.rank
                 });
             });
-            
-            // Aggiungi i cerchi (pallini) sui punti della linea
+        
             container.selectAll('.dot-' + player)
                 .data(playerData)
                 .enter().append('circle')
-                .attr('class', 'dot')                          // Classe per i cerchi
-                .attr('cx', d => x(d.data))                    // Posizione X (data)
-                .attr('cy', d => y(d.rank))                    // Posizione Y (rank)
-                .attr('r', 4)                                  // Raggio del cerchio
-                .style('fill', color(player));                 // Colore del cerchio (lo stesso della linea)
-        });
+                .attr('class', d => `dot player-${d.player} date-${d.dataFormatted}`)
+                .attr('cx', d => x(d.data))                             // Posizione X
+                .attr('cy', d => y(d.rank))                             // Posizione Y
+                .attr('r', (d, i) => i === 0 ? 20 : 4)                  // Raggio: 20 per il primo punto, 4 per gli altri
+                .style('fill', d => color(d.player))
+                .on('click', function(event, d) {
+                    const playerClass = `player-${d.player}`;
+                    
+                    // Rendi visibili al 100% i punti e le linee del giocatore cliccato
+                    d3.selectAll(`.${playerClass}`)
+                        .transition()
+                        .duration(500)
+                        .style('opacity', 1);
+                
+                    // Rendi meno visibili tutti gli altri punti e linee
+                    d3.selectAll(`.dot:not(.${playerClass})`)
+                        .transition()
+                        .duration(500)
+                        .style('opacity', 0.3);
+                
+                    d3.selectAll(`.img-player:not(.${playerClass})`)
+                        .transition()
+                        .duration(500)
+                        .style('opacity', 0.3);
+                });
+            
+            // Aggiunta dei cerchi
+            container.selectAll('.dot-' + player)
+                .data(playerData)
+                .enter().append('circle')
+                .attr('class', d => `dot player-${d.player} date-${d.dataFormatted}`)
+                .attr('cx', d => x(d.data))                             // Posizione X
+                .attr('cy', d => y(d.rank))                             // Posizione Y
+                .attr('r', (d, i) => i === 0 ? 20 : 4)                  // Raggio: 20 per il primo punto, 4 per gli altri
+                .style('fill', d => color(d.player))
+                .on('click', function(event, d) {
+                    const playerClass = `player-${d.player}`;
 
-        // Etichette degli assi
-        container.append('text')
-            .attr('x', widthChart / 2)
-            .attr('y', heightChart + margin.bottom - 5)
-            .style('text-anchor', 'middle')
-            .text('Date');
+                    d3.selectAll('.line').style('opacity', 0.3);
+                    d3.selectAll('.dot').style('opacity', 0.3);
+                    d3.selectAll('.img-player').style('opacity', 0.3);  
+                    
+                    // Rendi visibili al 100% i punti e le linee del giocatore cliccato
+                    d3.selectAll(`.${playerClass}`)
+                        .transition()
+                        .duration(500)
+                        .style('opacity', 1);
 
-        container.append('text')
-            .attr('x', -heightChart / 2)
-            .attr('y', -margin.left + 15)
-            .style('text-anchor', 'middle')
-            .attr('transform', 'rotate(-90)')
-            .text('Ranking');
-
-        // Aggiungi rettangoli allineati alle tacche dell'asse Y (per esempio)
-        const ticksY2 = y.ticks(nPlayers);  // Usa i valori dei tick Y
-
-        // Calcola la distanza tra due tacche consecutive sull'asse Y
-        const tickDistance = Math.abs(y(ticksY2[1]) - y(ticksY2[0]));
-        const padding = 5; // Padding tra rettangoli
-        const rectHeight = tickDistance - padding; // Altezza rettangolo con padding
-
-        const rectWidth = 400;  // Larghezza del rettangolo
-        const rectOffset = 50;  // Distanza dal bordo destro del grafico
-
-        // Gestione evento mousemove per verificare la distanza
-        container.append('rect')
-            .attr('width', widthChart)
-            .attr('height', heightChart)
-            .style('fill', 'none')
-            .style('pointer-events', 'all') // Permette di intercettare eventi sul grafico
-            .on('mousemove', function (event) {
-                const [mouseX, mouseY] = d3.pointer(event, this);
-
-                // Trova il punto più vicino
-                let closestPoint = null;
-                let minDistance = Infinity;
-                allPoints.forEach(point => {
-                    const distance = Math.sqrt(
-                        Math.pow(point.x - mouseX, 2) + Math.pow(point.y - mouseY, 2)
-                    );
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestPoint = point;
-                    }
+                    // Rendi meno visibili tutti gli altri punti e linee
+                    d3.selectAll(`.dot:not(.${playerClass})`)
+                        .transition()
+                        .duration(500)
+                        .style('opacity', 0.3);
+                    
+                    d3.selectAll(`.img-player:not(.${playerClass})`)
+                        .transition()
+                        .duration(500)
+                        .style('opacity', 0.3);
                 });
 
-                // Ingrandisci i punti vicini
-                const threshold = 20; // Distanza massima per considerare un punto "vicino"
-                container.selectAll('.dot')
-                    .attr('r', d => {
-                        const pointX = x(d.data);
-                        const pointY = y(d.rank);
-                        const distance = Math.sqrt(
-                            Math.pow(pointX - mouseX, 2) + Math.pow(pointY - mouseY, 2)
-                        );
-                        return distance < threshold ? 8 : 4; // Ingrandisce se entro soglia, altrimenti torna normale
-                    });
+            // Aggiunta delle immagini al primo cerchio di ogni giocatore
+            container.selectAll('.img-player-' + player)
+                .data(playerData.filter((d, i) => i === 0)) // Filtra solo il primo elemento di ogni giocatore
+                .enter().append('image')
+                .attr('class', d => `img-player player-${d.player}`)
+                .attr('width', 40)                              // Larghezza dell'immagine
+                .attr('height', 40)                             // Altezza dell'immagine
+                .attr('x', d => x(d.data) - 20)                 // Posizione X centrata (cx - larghezza/2)
+                .attr('y', d => y(d.rank) - 20)                 // Posizione Y centrata (cy - altezza/2)
+                .attr('xlink:href', d => `assets/images/${d.player}.png`);
+            
+        });
+
+        // Aggiungi un evento click sull'SVG
+        svg.on('click', function(event)
+        {
+            // Verifica se il target dell'evento è direttamente l'SVG
+            if (event.target === this) 
+            {
+                console.log('Clicked on SVG background');
+                // Aggiungi qui il codice che vuoi eseguire per il clic sullo sfondo
+                d3.selectAll('.line').style('opacity', 0.3);
+                d3.selectAll('.dot').style('opacity', 0.3);
+                d3.selectAll('.img-player').style('opacity', 0.3);                
+            }
+        });
+
+        // SLIDER
+        // add rect for the slider
+        const rect = container.append('rect')
+            .attr('x', Constants.rectX)
+            .attr('y', Constants.rectY)
+            .attr('width', Constants.sliderWidth)
+            .attr('height', Constants.sliderHeight)
+            .attr('rx', 10) 
+            .style('fill', 'lightgray')
+            .style('opacity', 0.3) 
+            .attr('name', 'rect-slider');
+
+        // Creazione del triangolo
+        const triangle = container.append('polygon')
+            .attr('points', `${Constants.triangleX + Constants.triangleWidth / 2},
+                            -${Constants.triangleHeight} ${Constants.triangleX},
+                            -${Constants.yLowAngle} ${Constants.triangleX - Constants.triangleWidth / 2},
+                            -${Constants.triangleHeight}`)
+            .style('fill', 'gray')
+            .attr('name', 'triangle-slider');
+        
+        // Ottieni le tacche dell'asse X
+        const ticks = x.ticks();  // Restituirà un array di date
+        
+        // Funzione per ottenere la tacca più vicina in base alla posizione X
+        const getClosestTick = (xPos) => {
+            const xDate = x.invert(xPos);  // Converti la posizione in una data
+            return ticks.reduce((prev, curr) => {
+                return (Math.abs(curr - xDate) < Math.abs(prev - xDate) ? curr : prev);
+            });
+        };
+
+        // Funzione per aggiornare la posizione del triangolo
+        const updateTrianglePosition = (x) => {
+            triangle.attr('points', `${x + Constants.triangleX + Constants.triangleWidth / 2},
+                                    -${Constants.triangleHeight} ${Constants.triangleX + x},
+                                    -${Constants.yLowAngle} ${x + Constants.triangleX - Constants.triangleWidth / 2},
+                                    -${Constants.triangleHeight}`);
+        };
+
+        // Funzione per aggiornare la posizione del rettangolo
+        const updateRectPosition = (x) => {
+            rect.attr('x', Constants.rectX + x);
+        };  
+
+        // Imposta il drag handler
+        const dragHandler = d3.drag()
+            .on('drag', (event) => {
+                svg.selectAll(".dot")
+                    .attr("r", Constants.radiusNormal);
+
+                // Calcola la nuova posizione lungo l'asse x
+                const newX = event.x;
+
+                // Limita la posizione X tra 0 e 800 (o il range della tua grafica)
+                const clampedX = Math.max(0, Math.min(newX, Constants.widthChart));
                 
-                // Ottieni la data corrispondente alla posizione del mouse sull'asse X
-                const mouseDate = x.invert(mouseX); // Converti la posizione X in data
-                const formattedDate = d3.timeFormat('%Y-%m')(mouseDate); // Formatta la data
+                // Aggiorna la posizione del triangolo e del rettangolo in tempo reale
+                updateTrianglePosition(clampedX);
+                updateRectPosition(clampedX);
+            })
+            .on('end', (event) => {
+                // Ottieni la tacca più vicina alla posizione finale del mouse
+                const closestTick = getClosestTick(event.x);
+
+                // Posiziona il triangolo e il rettangolo sulla tacca più vicina
+                const closestTickX = x(closestTick);  // Ottieni la posizione x corrispondente alla data
+
+                // Rimuovi immagine precedente se esiste
+                svg.selectAll(".dot")
+                .each(function () {
+                    // Seleziona tutte le immagini con la classe `img-player` relative a questo cerchio
+                    d3.select(this.parentNode) // Il nodo contenitore del cerchio
+                        .selectAll("image.img-player") // Seleziona le immagini con classe `img-player`
+                        .remove(); // Rimuovi tutte le immagini trovate
+                });
+
+                dateSlider = closestTick;            // aggiorno stato dello slider
+                console.log("Posizione Slider:");
+                console.log(convertToYYYYMM(dateSlider));
+
+                updateTrianglePosition(closestTickX);
+                updateRectPosition(closestTickX);
+
+                // Trova tutti i cerchi con la classe "dot" e un "data" corrispondente alla data
+                const tickString = d3.timeFormat('%Y-%m')(closestTick); // Converti la tacca in formato "yyyy-mm"
                 
-                // Ottieni il rank corrispondente alla posizione del mouse sull'asse Y
-                const mouseRank = y.invert(mouseY); // Converti la posizione Y in rank
-                const formattedRank = Math.round(mouseRank); // Arrotonda il rank
-                
-                // con (Data e nPlayers) ottengo la lista dei primi nPlayers del ranking in quella data
-                // questa lista contiene anche il punteggio atp
-                var ranking = getRankingbyData(jsonFilteredRanking, formattedDate, nPlayers);
+                // Seleziona i cerchi con la classe specifica e aggiorna il raggio
+                container.selectAll('.date-' + tickString)
+                    .transition()
+                    .duration(150)
+                    .attr('r', 20)
+                    .on('end', function () {
+                        // Al termine della transizione, aggiungi l'immagine
+                        // Usa il nome della seconda classe per determinare il file PNG
+                        const circle = d3.select(this); // Cerchio corrente
 
-                var infoRanking = [];
-                if (ranking.length) {
-                    ranking.forEach(element => {
-                        // Dall'id del player ottengo le informazioni generali del giocatore
-                        let dict = getDataPlayer(jsonPlayers, element.player);
-                        // Aggiungo il punteggio
-                        dict["points"] = element.points;
-                        infoRanking.push(dict);
+                        const classList = circle.attr('class').split(' '); // Ottieni tutte le classi del cerchio
+                        const imageClass = classList[1].substring(7); // Supponendo che la seconda classe sia quella utile
+                        const imagePath = "../assets/images/" + imageClass + '.png'; // Percorso dell'immagine
+                        const defaultImagePath = "../assets/images/00000.png"; // Immagine di default
+
+                        // Funzione per aggiungere un'immagine al cerchio
+                        function appendImage(src) {
+                            container.append('image')
+                                .attr('xlink:href', src)
+                                .attr('class', `img-player player-${imageClass}`)
+                                .attr('width', 40)                      // Imposta la larghezza immagine
+                                .attr('height', 40)                     // Imposta l'altezza immagine
+                                .attr('x', circle.attr('cx') - 20)      // Centra l'immagine rispetto al cerchio
+                                .attr('y', circle.attr('cy') - 20);     // Centra l'immagine rispetto al cerchio
+                        }
+
+                        // Controlla se il file esiste
+                        fetch(imagePath, { method: 'HEAD' })
+                            .then(response => {
+                                if (response.ok) {
+                                    // Se il file esiste
+                                    appendImage(imagePath);
+                                } else {
+                                    // Se il file non esiste, usa l'immagine di default
+                                    appendImage(defaultImagePath);
+                                }
+                            })
+                            .catch(() => {
+                                // In caso di errore, usa comunque l'immagine di default
+                                appendImage(defaultImagePath);
+                            });
                     });
-                    // Svuota il contenitore rankingCol eliminando tutti i suoi figli
-                    //rankingCol.selectAll("*").remove();
-                    // Rimuovi prima gli elementi esistenti con la classe 'y-tick-text-second'
-                    container.selectAll('.y-tick-circle').remove();
-                    container.selectAll('.y-tick-text').remove();
-                    container.selectAll('.y-tick-text-second').remove();
-
-                    // Invert array
-                    const reversedInfoRanking = infoRanking.slice().reverse();  
-                    const reversedRanking = ranking.slice().reverse();
-
-                    reversedRanking.forEach(element => {
-                        let infoPlayer = getDataPlayer(jsonPlayers ,element.player);
-                        element['name_first'] = infoPlayer.name_first;
-                        element['name_last'] = infoPlayer.name_last;
-                    });
-
-                    //console.log(reversedRanking);
-
-                    container.selectAll('.y-tick-circle')
-                    .data(ticksY2)
-                    .enter()
-                    .append('g')
-                    .attr('class', 'y-tick-circle')
-                    .attr('transform', d => `translate(${widthChart + rectOffset}, ${y(d)})`)
-                    .each(function(d, i) { // Usa `each` per gestire gli elementi del gruppo
-                        d3.select(this)
-                            .append('circle')
-                            .attr('r', 30 - nPlayers)
-                            .style('fill', 'lightblue')
-                            .style('stroke', 'steelblue')
-                            .style('stroke-width', 1);
-
-                        d3.select(this)
-                            .append('image')
-                            .attr('xlink:href', `./assets/images/${reversedRanking[i].player}.png`) // Percorso immagine
-                            .attr('x', -12.5) // Centra rispetto al cerchio
-                            .attr('y', -12.5) // Centra rispetto al cerchio
-                            .attr('width', 25)
-                            .attr('height', 25);
-                    });
-                    
-                    const initialOffset = 40; // Offset iniziale
-
-                    container.selectAll('.y-tick-text')
-                        .data(ticksY2)
-                        .enter()
-                        .append('g') // Usa un gruppo per contenere tutti i segmenti di testo
-                        .attr('class', 'y-tick-text')
-                        .attr('transform', d => `translate(${widthChart + rectOffset + initialOffset}, ${y(d)})`)  
-                        .each(function(d, i) {
-                            const playerInfo = reversedInfoRanking[i];
-                            const group = d3.select(this);
-
-                            // Nome del giocatore
-                            group.append('text')
-                                .text(`${playerInfo.name_first} ${playerInfo.name_last}`)
-                                .attr('x', 0) // Prima colonna (relativa all'offset iniziale)
-                                .style('text-anchor', 'start')
-                                .style('fill', 'black')
-                                .style('font-size', '12px');
-
-                            // Punti
-                            group.append('text')
-                                .text(`Points: ${playerInfo.points}`)
-                                .attr('x', 125) // Seconda colonna
-                                .style('text-anchor', 'start')
-                                .style('fill', 'black')
-                                .style('font-size', '12px');
-
-                            // Mano
-                            group.append('text')
-                                .text(`Hand: ${playerInfo.hand}`)
-                                .attr('x', 215) // Terza colonna
-                                .style('text-anchor', 'start')
-                                .style('fill', 'black')
-                                .style('font-size', '12px');
-
-                            // Paese
-                            group.append('text')
-                                .text(`Country: ${playerInfo.ioc}`)
-                                .attr('x', 280) // Quarta colonna
-                                .style('text-anchor', 'start')
-                                .style('fill', 'black')
-                                .style('font-size', '12px');
-                        });
-
-                    // Aggiungi i nuovi elementi text per ogni tick dell'asse Y
-                    //container.selectAll('.y-tick-text-second')
-                    //    .data(ticksY2)
-                    //    .enter()
-                    //    .append('text')
-                    //    .attr('class', 'y-tick-text-second')
-                    //    .attr('x', widthChart + rectOffset + 40)  
-                    //    .attr('y', d => y(d) + 15)  
-                    //    .style('text-anchor', 'start')  
-                    //    .text((d, i) => `Points: ${reversedInfoRanking[i].points}`)  
-                    //    .style('fill', 'grey')  
-                    //    .style('font-size', '10px');
-
-                    // Esegui il log dopo aver aggiunto gli elementi
-                    console.log(container.selectAll('.y-tick-circle').nodes());
-                    console.log(container.selectAll('.y-y-tick-texxt').nodes());
-                    console.log(container.selectAll('.y-tick-text-second').nodes());
-                    
-                }
-
-            }).on('mouseout', () => {
-                // Ripristina tutti i punti e nasconde i tooltip
-                container.selectAll('.dot')
-                    .attr('r', 4); // Torna alla dimensione normale
-                //playerId.text('');
             });
 
+        // Associa il drag handler al triangolo
+        dragHandler(triangle);
+        
     } catch (error) {
         console.error('Errore nel disegno del grafico:', error);
         return null;
     }
 }
+

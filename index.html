@@ -24,7 +24,7 @@
 
     <div class="container">
         <div class="row">
-            <div class="col-12">
+            <div class="col-7">
                 <form id="form">
                     <label>Start Interval:</label>
                     <select name="start" id="start">
@@ -50,7 +50,7 @@
                     </label>
                     <label for="years">
                         <input type="radio" id="years" name="grain" value="Years"> Years
-                    </label>
+                    </label><br>
     
                     <label>Number of players:</label>
                     <select name="players" id="players">
@@ -65,15 +65,13 @@
                     <input type="submit" id="drawSubmit" value="Draw">
                 </form>
             </div>
+            <div id="coordinate" class="col-5"></div>
         </div>
     </div>
     <div class="container-fluid">
         <div class="row mx-0">
-            <div class="col-7">
-                <svg width="1100" height="500"></svg>
-            </div>
-            <div id="ranking-col" class="col-5">
-                <!--<div id="ranking-tooltip" class="row"></div>-->
+            <div class="col-12">
+                <svg id="chartlinesSVG"></svg>
             </div>
         </div>
     </div>

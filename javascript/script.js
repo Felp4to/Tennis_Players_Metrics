@@ -11,7 +11,7 @@ const form = document.getElementById('form');
 document.getElementById('form').addEventListener('submit', async function(event) {
     event.preventDefault();
 
-    // Leggi i dati dal form
+    // read data form
     var startInterval = document.getElementById('start').value;
     var endInterval = document.getElementById('end').value;
     var nPlayers = document.getElementById('players').value;
@@ -24,7 +24,7 @@ document.getElementById('form').addEventListener('submit', async function(event)
     });
 
     try {
-        // Recupera i dati dal file JSON
+        // read data from files
         const jsonRanking = await fetchJSONData('./data/ranking/json/ranking_10s_clean.json');
         const jsonPlayers = await loadCsvFromUrl('./data/players/atp_players.csv');
         

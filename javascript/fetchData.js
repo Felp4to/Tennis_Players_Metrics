@@ -1,5 +1,6 @@
 // fetchData.js
 
+
 export async function fetchJSONData(url) {
     try {
         const response = await fetch(url);
@@ -46,3 +47,4 @@ function csvToJson(csv) {
     }
     return result;
 }
+
