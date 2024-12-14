@@ -1,5 +1,8 @@
 // functions.js
 
+import * as Constants from './constants.js';
+
+// convert format date
 export function convertToYYYYMM(dateString)
 {
     // Converte la stringa in un oggetto Date
@@ -14,3 +17,21 @@ export function convertToYYYYMM(dateString)
     // Combina anno e mese nel formato richiesto
     return `${year}-${month}`;
 }
+
+// get colors
+export function getColorScale(players)
+{
+    // Creazione della scala di colori pastello
+    return d3.scaleOrdinal()
+        .domain(Array.from(players.keys()))
+        .range(d3.schemeCategory10.map(c => d3.interpolateLab(c, "#ffffff")(0.4)));
+}
+
+// clear SVG
+export function clearSVG(svg)
+{
+    // clear graph
+    svg.selectAll('*').remove();
+}
+
+

@@ -88,3 +88,15 @@ export function getDataPlayer(data, playerId)
 {
     return data.find(player => player.player_id === playerId);
 }
+
+// return data for draw line chart
+export function getDataForLineChart(jsonRanking, jsonPlayers, startInterval, endInterval, grain, nPlayers)
+{
+    var jsonFilteredRanking = applyFilter(jsonRanking, startInterval, endInterval, grain, nPlayers);
+    jsonFilteredRanking.forEach(element => {
+        const info = getDataPlayer(jsonPlayers, element.player);
+        element.info = info;
+    });
+
+    return jsonFilteredRanking;
+}
